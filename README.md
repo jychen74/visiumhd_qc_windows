@@ -1,4 +1,4 @@
-# Visium HD Nuclear Segmentation QC on Windows (WSL2)
+# Visium HD Nuclei Segmentation QC on Windows (WSL2)
 
 A complete workflow for running `spaceranger segment` on Windows using WSL2,
 
