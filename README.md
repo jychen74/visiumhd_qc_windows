@@ -194,7 +194,7 @@ Record this value. For the same scanner, it will not change between slides.
 
 Select your annotation in the Annotations panel, then run `crop_visiumHD.groovy`
 
-in the Script Editor (see [`scripts/crop_visiumHD.groovy`](https://claude.ai/chat/scripts/crop_visiumHD.groovy)).
+in the Script Editor (see [`scripts/crop_visiumHD.groovy`](scripts/crop_visiumHD.groovy)).
 
 **Each slide, only edit these three lines:**
 
