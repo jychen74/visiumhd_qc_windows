@@ -20,7 +20,7 @@
  *   Space Ranger 4.1.0
  *   Pixel size: 0.26455 µm/px (Adjust PIXEL_SIZE_UM if using a different scanner)
  *
- * Author: Jing-Yuan Chen, National Center for Biomodels (NCB), National Institute of Applied Research
+ * Author: Jing-Yuan Chen, National Center for Biomodels (NCB), National Institute of Applied Research (NIAR)
  */
 
 // ============================================================
