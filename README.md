@@ -300,7 +300,7 @@ RNA per cell = 1,725,000 ÷ 221,003 = 7.8 pg/cell → Proceed ✅
 
 A successful run produces the following web summary:
 
-<img src="images/segment.webp" width="700">
+![Nucleus Segmentation web summary](images/segment.webp)
 
 Key metric to record for RNA per cell calculation:
 
