@@ -1,3 +1,4 @@
+
 # Visium HD Nuclei Segmentation QC on Windows (WSL2)
 
 A complete workflow for running `spaceranger segment` on Windows using WSL2,
@@ -150,7 +151,7 @@ Whole-slide images are typically stored as compressed formats (e.g. SVS ~500 MB)
 
 However, exporting a region as uncompressed TIFF expands the file significantly.
 
-A 6.5 × 6.5 mm crop at full resolution (\~0.26 µm/px) produces a file of  **~1.5–2 GB** .
+A 6.5 × 6.5 mm crop at full resolution (~0.26 µm/px) produces a file of  **~1.5–2 GB** .
 
 Cropping is still necessary because:
 
@@ -194,7 +195,7 @@ Record this value. For the same scanner, it will not change between slides.
 
 Select your annotation in the Annotations panel, then run `crop_visiumHD.groovy`
 
-in the Script Editor (see [`scripts/crop_visiumHD.groovy`](scripts/crop_visiumHD.groovy)).
+in the Script Editor (see [`scripts/crop_visiumHD.groovy`](https://claude.ai/chat/scripts/crop_visiumHD.groovy)).
 
 **Each slide, only edit these three lines:**
 
@@ -210,7 +211,33 @@ The Centroid X/Y µm values are shown in the left panel after selecting the anno
 
 ---
 
-## Step 2: Transfer Image to WSL2
+## Step 2: Mount External SSD and Transfer Image to WSL2
+
+### 2a. Mount external SSD (if not auto-mounted)
+
+External drives are not always automatically mounted in WSL2. Check first:
+
+```bash
+ls /mnt/
+# If d/ is not listed, mount manually:
+sudo mkdir -p /mnt/d
+sudo mount -t drvfs D: /mnt/d
+```
+
+Verify the drive is accessible:
+
+```bash
+ls /mnt/d/
+```
+
+> **Note:** You need to remount after every WSL2 restart (`wsl --shutdown`).
+> To avoid this, add the following to `/etc/fstab` inside WSL2 for automatic mounting:
+>
+> ```
+> D: /mnt/d drvfs defaults 0 0
+> ```
+
+### 2b. Transfer image to WSL2 native filesystem
 
 ```bash
 # Copy from Windows-mounted SSD into WSL2 native filesystem
@@ -225,24 +252,60 @@ ls -lh ~/spaceranger_work/input/
 ## Step 3: Run spaceranger segment
 
 ```bash
-~/spaceranger_work/spaceranger-4.1.0/spaceranger segment \
-  --id=sample_QC \
+/home/<username>/spaceranger_work/spaceranger-4.1.0/spaceranger segment \
+  --id=tumor_20260602_1 \
   --tissue-image=/home/<username>/spaceranger_work/input/cropped_HE.tif \
-  --output-dir=/home/<username>/spaceranger_work/output \
+  --output-dir=/home/<username>/spaceranger_work/output/tumor_20260602_1 \
   --localcores=8 \
   --localmem=20
 ```
 
 > **Note:** Use absolute paths (e.g. `/home/jychen/...`) instead of `~/`.
->
 > The `--tissue-image` argument does not expand `~` correctly.
+
+> ⚠️ **Important: `--id` and `--output-dir` must both be changed for each new sample.**
+> Spaceranger keeps a pipestance record in the output directory. If you reuse the same
+> `--output-dir` with a different `--id`, it will throw:
+> `RuntimeError: pipestance already exists with different invocation file`
+> Always use a unique name (e.g. sample name or date) for both `--id` and `--output-dir`.
+
+### Running multiple samples
+
+```bash
+# Sample 1
+/home/<username>/spaceranger_work/spaceranger-4.1.0/spaceranger segment \
+  --id=tumor_20260602_1 \
+  --tissue-image=/home/<username>/spaceranger_work/input/cropped_HE_1.tif \
+  --output-dir=/home/<username>/spaceranger_work/output/tumor_20260602_1 \
+  --localcores=8 --localmem=20
+
+# Sample 2
+/home/<username>/spaceranger_work/spaceranger-4.1.0/spaceranger segment \
+  --id=tumor_20260602_2 \
+  --tissue-image=/home/<username>/spaceranger_work/input/cropped_HE_2.tif \
+  --output-dir=/home/<username>/spaceranger_work/output/tumor_20260602_2 \
+  --localcores=8 --localmem=20
+```
+
+### Cleaning up old runs
+
+If you need to rerun a sample and want to clear previous results:
+
+```bash
+# Remove a specific run
+rm -rf /home/<username>/spaceranger_work/output/tumor_20260602_1
+
+# Or remove all outputs and start fresh
+rm -rf /home/<username>/spaceranger_work/output
+mkdir /home/<username>/spaceranger_work/output
+```
 
 **Expected runtime:** 15–30 minutes for a 1.7 GB image on 8 cores / 20 GB RAM
 
 ### Outputs
 
 ```
-output/outs/
+output/<sample_id>/outs/
 ├── nucleus_instance_mask.tiff     # Per-nucleus segmentation mask
 ├── nucleus_segmentations.geojson  # Nucleus boundary coordinates
 └── web_summary.html               # QC report (open in browser)
@@ -255,7 +318,7 @@ output/outs/
 Copy the web summary to Windows:
 
 ```bash
-cp /home/<username>/spaceranger_work/output/outs/web_summary.html /mnt/d/visium_QC/
+cp /home/<username>/spaceranger_work/output/tumor_20260602_1/outs/web_summary.html /mnt/d/visium_QC/
 ```
 
 Open `web_summary.html` in any browser. Key metric:
@@ -300,7 +363,7 @@ RNA per cell = 1,725,000 ÷ 221,003 = 7.8 pg/cell → Proceed ✅
 
 A successful run produces the following web summary:
 
-![Nucleus Segmentation web summary](images/segment.webp)
+![Nucleus Segmentation web summary](https://claude.ai/chat/images/segment.webp)
 
 Key metric to record for RNA per cell calculation:
 
@@ -313,13 +376,16 @@ Nucleus Segmentation Metrics
 
 ## Troubleshooting
 
-| Error                                               | Cause                                 | Fix                                                  |
-| --------------------------------------------------- | ------------------------------------- | ---------------------------------------------------- |
-| `symlink ... operation not permitted`             | Working directory on NTFS (`/mnt/`) | Move all files to WSL2 native FS                     |
-| `No such file or directory`for `--tissue-image` | `~`not expanded                     | Use full absolute path `/home/user/...`            |
-| `unexpected argument '--image'`                   | Wrong flag name in SR 4.x             | Use `--tissue-image`                               |
-| OOM / process killed                                | WSL2 RAM too low                      | Increase `.wslconfig`memory, reduce `--localmem` |
-| Martian UI not accessible in browser                | WSL2 network isolation                | Normal — does not affect execution                  |
+| Error                                                        | Cause                                                             | Fix                                                                                                |
+| ------------------------------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `symlink ... operation not permitted`                      | Working directory on NTFS (`/mnt/`)                             | Move all files to WSL2 native FS                                                                   |
+| `No such file or directory`for `--tissue-image`          | `~`not expanded                                                 | Use full absolute path `/home/user/...`                                                          |
+| `unexpected argument '--image'`                            | Wrong flag name in SR 4.x                                         | Use `--tissue-image`                                                                             |
+| `pipestance already exists with different invocation file` | `--output-dir`reused from previous run                          | Change both `--id`and `--output-dir`for each new sample, or `rm -rf`the old output directory |
+| `web_summary: null`/ Reattaching in local mode             | Spaceranger reattached to old pipestance instead of running fresh | Same as above — use a new `--output-dir`each time                                               |
+| External SSD not accessible at `/mnt/d/`                   | Drive not auto-mounted in WSL2                                    | Run `sudo mount -t drvfs D: /mnt/d`manually                                                      |
+| OOM / process killed                                         | WSL2 RAM too low                                                  | Increase `.wslconfig`memory, reduce `--localmem`                                               |
+| Martian UI not accessible in browser                         | WSL2 network isolation                                            | Normal — does not affect execution                                                                |
 
 ---
 
