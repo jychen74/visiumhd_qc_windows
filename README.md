@@ -189,25 +189,43 @@ def ps = server.getPixelCalibration().getAveragedPixelSizeMicrons()
 print "Pixel size: ${ps} µm/px"
 ```
 
-Record this value. For the same scanner, it will not change between slides.
+Record this value for documentation. The recommended export script below reads
+the pixel size directly from the image calibration, but recording it helps catch
+scanner or file-conversion problems.
 
 ### 1c. Export the cropped region
 
-Select your annotation in the Annotations panel, then run `crop_visiumHD.groovy`
+Select your annotation in the Annotations panel, then run
+`crop_visiumhd_selected_annotation.groovy`
 
-in the Script Editor (see [`scripts/crop_visiumHD.groovy`](https://claude.ai/chat/scripts/crop_visiumHD.groovy)).
+in the Script Editor (see [`scripts/crop_visiumhd_selected_annotation.groovy`](scripts/crop_visiumhd_selected_annotation.groovy)).
 
-**Each slide, only edit these three lines:**
+**Each slide, only edit the output path:**
+
+```groovy
+def outputFile = new File('C:/Users/<username>/Desktop/cropped_HE.tif')
+```
+
+The script uses the currently selected QuPath annotation, checks that it is
+approximately 6500 × 6500 µm, reads the image pixel calibration, and exports a
+full-resolution square crop. This avoids manually copying Centroid X/Y values
+for every slide.
+
+**Expected output size:** ~1–2 GB uncompressed TIFF at full resolution
+
+### 1d. Manual centroid fallback
+
+The older script, [`scripts/crop_visiumHD.groovy`](scripts/crop_visiumHD.groovy),
+is kept as a fallback when you need to reproduce a crop from explicit centroid
+coordinates instead of using the selected annotation.
+
+For that workflow, edit these values before running the script:
 
 ```groovy
 def centerX_um = 3132.14   // Centroid X µm from Annotations panel
 def centerY_um = 4745.63   // Centroid Y µm from Annotations panel
 def outputFile = new File('C:/Users/<username>/Desktop/cropped_HE.tif')
 ```
-
-The Centroid X/Y µm values are shown in the left panel after selecting the annotation.
-
-**Expected output size:** ~1–2 GB uncompressed TIFF at full resolution
 
 ---
 
@@ -363,7 +381,7 @@ RNA per cell = 1,725,000 ÷ 221,003 = 7.8 pg/cell → Proceed ✅
 
 A successful run produces the following web summary:
 
-![Nucleus Segmentation web summary](https://claude.ai/chat/images/segment.webp)
+![Nucleus Segmentation web summary](images/segment.webp)
 
 Key metric to record for RNA per cell calculation:
 
