@@ -7,7 +7,7 @@ designed for researchers who do not have access to a dedicated Linux workstation
 
 This workflow covers:
 
-1. Cropping a 6.5 × 6.5 mm H&E region from a whole-slide image using QuPath
+1. Cropping a 6.5 × 6.5 mm or 11 × 11 mm H&E region from a whole-slide image using QuPath
 2. Running `spaceranger segment` in WSL2 (Ubuntu 22.04)
 3. Interpreting the output for RNA per cell QC
 
@@ -52,7 +52,7 @@ This guide fills the gap for Windows users.
 >
 > significantly less RAM in practice.
 
-### Tested Configuration (spaceranger segment only)
+### Tested Configuration (spaceranger segment only, 6.5 mm baseline)
 
 | Component  | Spec                    | Notes                                    |
 | ---------- | ----------------------- | ---------------------------------------- |
@@ -151,7 +151,17 @@ Whole-slide images are typically stored as compressed formats (e.g. SVS ~500 MB)
 
 However, exporting a region as uncompressed TIFF expands the file significantly.
 
-A 6.5 × 6.5 mm crop at full resolution (~0.26 µm/px) produces a file of  **~1.5–2 GB** .
+At the same pixel size, an 11 × 11 mm crop contains approximately
+`(11 / 6.5)^2 = 2.86` times as many pixels as a 6.5 × 6.5 mm crop.
+For 8-bit RGB at 0.26455 µm/px, the raw pixel data alone are approximately
+1.8 GB and 5.2 GB, respectively (decimal GB); actual TIFF sizes depend on
+compression and metadata.
+
+An uncompressed 11 mm image at this resolution can exceed classic TIFF's
+4 GiB limit. If export fails because of this limit, use a BigTIFF-capable
+exporter and verify that the resulting image opens correctly and is accepted
+by your installed Space Ranger version. These scripts retain QuPath's
+`writeImageRegion` call and do not explicitly select a TIFF writer or compression.
 
 Cropping is still necessary because:
 
@@ -163,7 +173,12 @@ Cropping is still necessary because:
 
 Use **Objects → Annotations → Specify annotation** to place a precise
 
-6500 × 6500 µm rectangle on your tissue:
+rectangle matching your capture area on your tissue:
+
+| Capture area | Width (µm) | Height (µm) | Selected-annotation script |
+| --- | --- | --- | --- |
+| 6.5 × 6.5 mm | 6500 | 6500 | [`crop_visiumhd_selected_annotation.groovy`](scripts/crop_visiumhd_selected_annotation.groovy) |
+| 11 × 11 mm | 11000 | 11000 | [`crop_visiumhd_11mm_selected_annotation.groovy`](scripts/crop_visiumhd_11mm_selected_annotation.groovy) |
 
 ```
 Objects
@@ -171,8 +186,8 @@ Objects
     └── Specify annotation
         ├── X: <left edge position in µm>
         ├── Y: <top edge position in µm>
-        ├── Width:  6500
-        └── Height: 6500
+        ├── Width:  6500 or 11000
+        └── Height: 6500 or 11000 (same as Width)
 ```
 
 Adjust X/Y until the rectangle covers your tissue of interest.
@@ -195,23 +210,37 @@ scanner or file-conversion problems.
 
 ### 1c. Export the cropped region
 
-Select your annotation in the Annotations panel, then run
-`crop_visiumhd_selected_annotation.groovy`
+Select your rectangle annotation in the Annotations panel, then open the
+matching script from the table above in **Automate → Script Editor**.
+The existing filename remains the 6.5 mm version; the separate 11 mm script
+uses `TARGET_SIZE_UM = 11000.0`.
 
-in the Script Editor (see [`scripts/crop_visiumhd_selected_annotation.groovy`](scripts/crop_visiumhd_selected_annotation.groovy)).
-
-**Each slide, only edit the output path:**
+**For each slide, edit `outputFile` and use a unique filename:**
 
 ```groovy
-def outputFile = new File('C:/Users/<username>/Desktop/cropped_HE.tif')
+// 6.5 mm script
+def outputFile = new File('C:/path/to/output/cropped_he_6_5mm.tif')
+
+// 11 mm script
+def outputFile = new File('C:/path/to/output/cropped_he_11mm.tif')
 ```
 
-The script uses the currently selected QuPath annotation, checks that it is
-approximately 6500 × 6500 µm, reads the image pixel calibration, and exports a
-full-resolution square crop. This avoids manually copying Centroid X/Y values
-for every slide.
+The output directory must already exist. These are alternative settings in
+separate scripts; do not paste both declarations into the same script.
 
-**Expected output size:** ~1–2 GB uncompressed TIFF at full resolution
+Both scripts use the selected annotation, read the image pixel calibration,
+check the annotation dimensions against the selected capture size (±25 µm),
+check image bounds, and export a full-resolution square crop centered on the
+annotation. Use an axis-aligned rectangle and confirm that the image has valid,
+square-pixel calibration: the current implementation uses the averaged pixel size.
+
+The scripts were reported by the author to work on the original laptop.
+A locally inspected segmentation report confirms a Space Ranger 4.1.0 run with
+`--localcores=8 --localmem=20` and no reported alarms. The report does not by itself
+identify which crop script or capture size produced the input, or establish an
+11 mm runtime/memory benchmark. The report is not included in this repository.
+This repository update was checked statically; QuPath export and Space Ranger
+segmentation were not rerun during the update.
 
 ### 1d. Manual centroid fallback
 
@@ -224,7 +253,7 @@ For that workflow, edit these values before running the script:
 ```groovy
 def centerX_um = 3132.14   // Centroid X µm from Annotations panel
 def centerY_um = 4745.63   // Centroid Y µm from Annotations panel
-def outputFile = new File('C:/Users/<username>/Desktop/cropped_HE.tif')
+def outputFile = new File('C:/path/to/output/cropped_he_6_5mm.tif')
 ```
 
 ---
@@ -257,9 +286,13 @@ ls /mnt/d/
 
 ### 2b. Transfer image to WSL2 native filesystem
 
+The commands below use the 6.5 mm filename. For an 11 mm crop, replace
+`cropped_he_6_5mm.tif` with `cropped_he_11mm.tif` throughout and choose a unique
+run ID and output directory.
+
 ```bash
 # Copy from Windows-mounted SSD into WSL2 native filesystem
-cp /mnt/d/visium_QC/cropped_HE.tif ~/spaceranger_work/input/
+cp /mnt/d/visium_QC/cropped_he_6_5mm.tif ~/spaceranger_work/input/
 
 # Verify file integrity
 ls -lh ~/spaceranger_work/input/
@@ -272,7 +305,7 @@ ls -lh ~/spaceranger_work/input/
 ```bash
 /home/<username>/spaceranger_work/spaceranger-4.1.0/spaceranger segment \
   --id=tumor_20260602_1 \
-  --tissue-image=/home/<username>/spaceranger_work/input/cropped_HE.tif \
+  --tissue-image=/home/<username>/spaceranger_work/input/cropped_he_6_5mm.tif \
   --output-dir=/home/<username>/spaceranger_work/output/tumor_20260602_1 \
   --localcores=8 \
   --localmem=20
@@ -318,7 +351,11 @@ rm -rf /home/<username>/spaceranger_work/output
 mkdir /home/<username>/spaceranger_work/output
 ```
 
-**Expected runtime:** 15–30 minutes for a 1.7 GB image on 8 cores / 20 GB RAM
+**Expected runtime (6.5 mm baseline):** 15–30 minutes for a 1.7 GB image on 8 cores / 20 GB RAM.
+
+The 11 mm crop contains approximately 2.86 times as many pixels at the same
+resolution. Runtime and peak memory for 11 mm have not been benchmarked here;
+do not assume that the 6.5 mm estimates apply.
 
 ### Outputs
 
@@ -409,6 +446,7 @@ Nucleus Segmentation Metrics
 
 ## References
 
+* [Visium HD Gene Expression 2.0 User Guide (CG001679; 6.5 mm and 11 mm capture areas)](https://cdn.10xgenomics.com/image/upload/v1775578153/support-documents/CG001679_VisiumHD_GeneExpression_2.0_UG_Rev_A.pdf)
 * [Space Ranger System Requirements](https://www.10xgenomics.com/support/software/space-ranger/downloads/space-ranger-system-requirements)
 * [spaceranger segment documentation](https://www.10xgenomics.com/support/software/space-ranger/latest/analysis/running-pipelines/space-ranger-segment)
 * [CG001678 Visium HD FFPE Tissue Preparation Handbook 2.0 (10x Genomics)](https://www.10xgenomics.com/support/spatial-gene-expression-hd/documentation/steps/tissue-prep-for-ffpe/visium-hd-ffpe-tissue-preparation-handbook-2-0)

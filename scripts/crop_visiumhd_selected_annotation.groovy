@@ -32,7 +32,7 @@ def stopWithError = { String message ->
 
 // Windows path is accepted by QuPath. Use forward slashes.
 // The output directory must already exist.
-def outputFile = new File('C:/Users/jyche/Desktop/cropped_HE.tif')
+def outputFile = new File('C:/path/to/output/cropped_he_6_5mm.tif')
 
 // ============================================================
 // SETTINGS

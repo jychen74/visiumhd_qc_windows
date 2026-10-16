@@ -35,7 +35,7 @@ def centerY_um = 4745.63
 
 // Output file path (Windows path, use forward slashes)
 // Make sure the output directory already exists
-def outputFile = new File('C:/Users/jyche/Desktop/cropped_HE.tif')
+def outputFile = new File('C:/path/to/output/cropped_he_6_5mm.tif')
 
 // ============================================================
 // SETTINGS — adjust if using a different scanner
